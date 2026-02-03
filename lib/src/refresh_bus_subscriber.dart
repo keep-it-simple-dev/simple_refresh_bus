@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:simple_refresh_bus/src/refresh_bus.dart';
 
-/// Mixin for Cubits to subscribe to [RefreshBus] events.
+/// Mixin for Cubits and Blocs to subscribe to [RefreshBus] events.
 ///
 /// Uses [RefreshBus.instance] by default - zero configuration needed!
-/// Subscriptions are automatically cancelled when the cubit is closed.
+/// Subscriptions are automatically cancelled when the cubit/bloc is closed.
 ///
-/// Example:
+/// Example with Cubit:
 /// ```dart
 /// class ProfileGetCubit extends Cubit<ProfileGetState> with RefreshBusSubscriber {
 ///   ProfileGetCubit(this._repo) : super(const ProfileGetState()) {
@@ -23,7 +23,17 @@ import 'package:simple_refresh_bus/src/refresh_bus.dart';
 ///   }
 /// }
 /// ```
-mixin RefreshBusSubscriber<State> on Cubit<State> {
+///
+/// Example with Bloc:
+/// ```dart
+/// class ProfileBloc extends Bloc<ProfileEvent, ProfileState> with RefreshBusSubscriber {
+///   ProfileBloc() : super(const ProfileState()) {
+///     on<ProfileLoadRequested>(_onLoadRequested);
+///     onRefresh<Profile>(() async => add(ProfileLoadRequested()));
+///   }
+/// }
+/// ```
+mixin RefreshBusSubscriber<State> on BlocBase<State> {
   final List<StreamSubscription<dynamic>> _refreshBusSubscriptions = [];
 
   /// The [RefreshBus] instance. Override for testing or custom instances.

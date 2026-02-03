@@ -643,6 +643,125 @@ void main() {
       });
     });
   });
+
+  group('RefreshBusSubscriber with Bloc', () {
+    late RefreshBus testBus;
+
+    setUp(() {
+      testBus = RefreshBus.custom();
+    });
+
+    group('onRefresh()', () {
+      test('calls event handler when refresh signal received', () async {
+        final bloc = TestBloc(bus: testBus);
+
+        testBus.refresh<Profile>();
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        expect(bloc.loadProfileCallCount, equals(1));
+        await bloc.close();
+      });
+
+      test('calls event handler multiple times for multiple signals', () async {
+        final bloc = TestBloc(bus: testBus);
+
+        testBus.refresh<Profile>();
+        testBus.refresh<Profile>();
+        testBus.refresh<Profile>();
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        expect(bloc.loadProfileCallCount, equals(3));
+        await bloc.close();
+      });
+
+      test('only responds to matching type', () async {
+        final bloc = TestBloc(bus: testBus);
+
+        testBus.refresh<Profile>();
+        testBus.refresh<Dashboard>();
+        testBus.refresh<Profile>();
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        expect(bloc.loadProfileCallCount, equals(2));
+        expect(bloc.loadDashboardCallCount, equals(1));
+        await bloc.close();
+      });
+
+      blocTest<TestBloc, TestState>(
+        'emits correct states when refresh signal received',
+        build: () => TestBloc(bus: testBus),
+        act: (bloc) {
+          testBus.refresh<Profile>();
+        },
+        wait: const Duration(milliseconds: 50),
+        expect: () => [
+          const TestState(isLoading: true, loadCount: 0),
+          const TestState(isLoading: false, loadCount: 1),
+        ],
+      );
+    });
+
+    group('onData()', () {
+      test('calls handler with data when data signal received', () async {
+        final bloc = TestBloc(bus: testBus);
+
+        testBus.push<Profile>(const Profile('TestUser'));
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        expect(bloc.state.profile, equals(const Profile('TestUser')));
+        await bloc.close();
+      });
+
+      blocTest<TestBloc, TestState>(
+        'emits state with profile when Profile data pushed',
+        build: () => TestBloc(bus: testBus),
+        act: (bloc) {
+          testBus.push<Profile>(const Profile('BlocTestUser'));
+        },
+        wait: const Duration(milliseconds: 10),
+        expect: () => [
+          const TestState(profile: Profile('BlocTestUser')),
+        ],
+      );
+    });
+
+    group('subscription lifecycle', () {
+      test('subscriptions are cancelled when bloc is closed', () async {
+        final bloc = TestBloc(bus: testBus);
+
+        testBus.refresh<Profile>();
+        await Future.delayed(const Duration(milliseconds: 10));
+        expect(bloc.loadProfileCallCount, equals(1));
+
+        await bloc.close();
+
+        testBus.refresh<Profile>();
+        await Future.delayed(const Duration(milliseconds: 10));
+        expect(bloc.loadProfileCallCount, equals(1)); // Still 1, not 2
+      });
+
+      test('multiple blocs can listen to same type independently', () async {
+        final bloc1 = TestBloc(bus: testBus);
+        final bloc2 = TestBloc(bus: testBus);
+
+        testBus.refresh<Profile>();
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        expect(bloc1.loadProfileCallCount, equals(1));
+        expect(bloc2.loadProfileCallCount, equals(1));
+
+        await bloc1.close();
+
+        testBus.refresh<Profile>();
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        expect(bloc1.loadProfileCallCount, equals(1)); // Still 1 (closed)
+        expect(bloc2.loadProfileCallCount, equals(2)); // Incremented to 2
+
+        await bloc2.close();
+      });
+    });
+  });
 }
 
 // Helper cubit for error handling test
@@ -662,4 +781,63 @@ class _ErrorProneDataCubit extends Cubit<TestState>
 
   @override
   RefreshBus get refreshBus => _bus;
+}
+
+// Bloc events for testing
+abstract class TestBlocEvent {}
+
+class LoadProfileEvent extends TestBlocEvent {}
+
+class ProfileLoadedEvent extends TestBlocEvent {
+  final Profile profile;
+  ProfileLoadedEvent(this.profile);
+}
+
+class LoadDashboardEvent extends TestBlocEvent {}
+
+// Test bloc that uses RefreshBusSubscriber
+class TestBloc extends Bloc<TestBlocEvent, TestState>
+    with RefreshBusSubscriber<TestState> {
+  final RefreshBus _bus;
+  int loadProfileCallCount = 0;
+  int loadDashboardCallCount = 0;
+
+  TestBloc({required RefreshBus bus})
+      : _bus = bus,
+        super(const TestState()) {
+    on<LoadProfileEvent>(_onLoadProfile);
+    on<ProfileLoadedEvent>(_onProfileLoaded);
+    on<LoadDashboardEvent>(_onLoadDashboard);
+
+    onRefresh<Profile>(() async => add(LoadProfileEvent()));
+    onRefresh<Dashboard>(() async => add(LoadDashboardEvent()));
+    onData<Profile>((profile) => add(ProfileLoadedEvent(profile)));
+  }
+
+  @override
+  RefreshBus get refreshBus => _bus;
+
+  Future<void> _onLoadProfile(
+    LoadProfileEvent event,
+    Emitter<TestState> emit,
+  ) async {
+    loadProfileCallCount++;
+    emit(state.copyWith(isLoading: true));
+    await Future.delayed(Duration.zero);
+    emit(state.copyWith(isLoading: false, loadCount: state.loadCount + 1));
+  }
+
+  void _onProfileLoaded(
+    ProfileLoadedEvent event,
+    Emitter<TestState> emit,
+  ) {
+    emit(state.copyWith(profile: event.profile));
+  }
+
+  Future<void> _onLoadDashboard(
+    LoadDashboardEvent event,
+    Emitter<TestState> emit,
+  ) async {
+    loadDashboardCallCount++;
+  }
 }

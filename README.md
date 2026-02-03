@@ -1,6 +1,6 @@
 # Simple Refresh Bus
 
-A lightweight event bus for cross-cubit state synchronization in Flutter BLoC applications.
+A lightweight event bus for cross-cubit/bloc state synchronization in Flutter BLoC applications.
 
 ## Installation
 
@@ -11,7 +11,7 @@ dependencies:
 
 ## Usage
 
-### Subscribe to refresh signals
+### Subscribe to refresh signals (Cubit)
 
 ```dart
 class ProfileGetCubit extends Cubit<ProfileGetState>
@@ -23,6 +23,19 @@ class ProfileGetCubit extends Cubit<ProfileGetState>
 
   Future<void> load() async {
     // Fetch from API...
+  }
+}
+```
+
+### Subscribe to refresh signals (Bloc)
+
+```dart
+class ProfileBloc extends Bloc<ProfileEvent, ProfileState>
+    with RefreshBusSubscriber<ProfileState> {
+
+  ProfileBloc() : super(const ProfileState()) {
+    on<ProfileLoadRequested>(_onLoadRequested);
+    onRefresh<Profile>(() async => add(ProfileLoadRequested()));
   }
 }
 ```
