@@ -1,0 +1,27 @@
+name: simple_refresh_bus
+description: A lightweight event bus for cross-cubit state synchronization in Flutter BLoC apps. Zero config, type-safe refresh signals and data passing.
+version: 1.0.0
+repository: https://github.com/keep-it-simple-dev/simple_refresh_bus
+issue_tracker: https://github.com/keep-it-simple-dev/simple_refresh_bus/issues
+topics:
+  - bloc
+  - cubit
+  - state-management
+  - event-bus
+  - flutter
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  bloc_test: ^10.0.0
+  mocktail: ^1.0.0
